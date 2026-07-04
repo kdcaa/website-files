@@ -1,1 +1,4 @@
+User-agent: *
+Allow: /
 
+Sitemap: https://kashyapdental.com.np/sitemap.xml
