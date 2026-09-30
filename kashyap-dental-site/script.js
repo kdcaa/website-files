@@ -15,7 +15,12 @@ const CLINIC = {
   slotMinutes: 30,
 
   // Clinic time zone (used for "Open now" and today's date)
-  timeZone: 'Asia/Kathmandu'
+  timeZone: 'Asia/Kathmandu',
+
+  // Online booking: paste your Google Apps Script "Web app URL" here
+  // (ends in /exec — see README §5). While empty, the form sends
+  // requests to Netlify Forms instead and the clinic confirms by phone.
+  bookingApi: ''
 };
 /* -------------------------------------------------- */
 
@@ -206,10 +211,13 @@ const CLINIC = {
     $$('.service-more-btn').forEach(b => { b.hidden = true; });
   }
 
-  /* ---------- Booking form ---------- */
+  /* ---------- Booking form ----------
+     With CLINIC.bookingApi set: live availability + instant booking via Google.
+     Without it (or if Google can't be reached): request sent to Netlify Forms. */
   const form = $('#booking-form');
   if (!form) return;
 
+  const API = (CLINIC.bookingApi || '').trim();
   const dateIn = $('#f-date');
   const timeIn = $('#f-time');
   const slotsWrap = $('#slots');
@@ -217,6 +225,8 @@ const CLINIC = {
   const statusEl = $('#form-status');
   const submitBtn = $('#submit-btn');
   const successBox = $('#booking-success');
+  const hhmm = min => `${String(Math.floor(min / 60)).padStart(2, '0')}:${String(min % 60).padStart(2, '0')}`;
+  const prettyTime = v => v ? fmtTime(toMin(v)) : '';
 
   // Earliest date = today (clinic time); latest = 60 days ahead
   const todayIso = clinicNow().date;
@@ -231,48 +241,83 @@ const CLINIC = {
     const el = form.querySelector(`[data-error-for="${field}"]`);
     if (el) el.textContent = msg || '';
     const input = form.elements[field];
-    if (input) input.setAttribute('aria-invalid', msg ? 'true' : 'false');
+    if (input && input.type !== 'hidden') input.setAttribute('aria-invalid', msg ? 'true' : 'false');
   }
 
-  function renderSlots() {
+  let availToken = 0;
+
+  async function renderSlots() {
+    const token = ++availToken;
     slotsWrap.innerHTML = '';
     timeIn.value = '';
+    setError('time', '');
     if (!dateIn.value) { slotNote.textContent = 'Pick a date to see available times.'; return; }
 
-    const [y, m, d] = dateIn.value.split('-').map(Number);
+    const date = dateIn.value;
+    const [y, m, d] = date.split('-').map(Number);
     const day = new Date(y, m - 1, d).getDay();
     const h = hours[day];
     if (!h) {
-      slotNote.textContent = hasHours
-        ? `We're closed on ${DAYS[day]}s. Please choose another day.`
-        : '';
+      slotNote.textContent = hasHours ? `We're closed on ${DAYS[day]}s. Please choose another day.` : '';
       if (hasHours) setError('date', `Closed on ${DAYS[day]}s`);
       return;
     }
     setError('date', '');
 
+    // Ask Google which slots are already taken
+    let full = new Set();
+    if (API) {
+      slotNote.textContent = 'Checking available times…';
+      slotsWrap.setAttribute('aria-busy', 'true');
+      try {
+        const res = await fetch(`${API}?action=availability&date=${encodeURIComponent(date)}`);
+        const data = await res.json();
+        if (token !== availToken) return; // user picked another date meanwhile
+        if (data.closed) {
+          slotsWrap.removeAttribute('aria-busy');
+          slotNote.textContent = `The clinic is closed on this date${data.reason ? ` (${data.reason})` : ''}. Please choose another day.`;
+          setError('date', 'Clinic closed on this date');
+          return;
+        }
+        full = new Set(data.full || []);
+      } catch (err) {
+        if (token !== availToken) return;
+        // Offline or Google unreachable: show all times; request goes to Netlify instead
+      }
+      slotsWrap.removeAttribute('aria-busy');
+    }
+
     const now = clinicNow();
-    const isToday = dateIn.value === now.date;
-    let count = 0;
+    const isToday = date === now.date;
+    let free = 0;
     for (let t = h.open; t + CLINIC.slotMinutes <= h.close; t += CLINIC.slotMinutes) {
       if (isToday && t <= now.minutes + 30) continue; // need at least 30 min notice
+      const value = hhmm(t);
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'slot';
-      b.textContent = fmtTime(t);
-      b.setAttribute('aria-pressed', 'false');
-      b.addEventListener('click', () => {
-        const wasOn = b.getAttribute('aria-pressed') === 'true';
-        $$('.slot', slotsWrap).forEach(x => x.setAttribute('aria-pressed', 'false'));
-        b.setAttribute('aria-pressed', String(!wasOn));
-        timeIn.value = wasOn ? '' : fmtTime(t);
-      });
+      b.dataset.value = value;
+      if (full.has(value)) {
+        b.disabled = true;
+        b.classList.add('full');
+        b.innerHTML = `${fmtTime(t)}<small>Booked</small>`;
+        b.setAttribute('aria-label', `${fmtTime(t)}, already booked`);
+      } else {
+        b.textContent = fmtTime(t);
+        b.setAttribute('aria-pressed', 'false');
+        b.addEventListener('click', () => {
+          $$('.slot', slotsWrap).forEach(x => x.setAttribute('aria-pressed', 'false'));
+          b.setAttribute('aria-pressed', 'true');
+          timeIn.value = value;
+          setError('time', '');
+        });
+        free++;
+      }
       slotsWrap.appendChild(b);
-      count++;
     }
-    slotNote.textContent = count
-      ? 'Preferred time (optional, we\'ll confirm with you):'
-      : 'No more times available today. Please pick another day.';
+    slotNote.textContent = free
+      ? 'Choose a time:'
+      : (isToday ? 'No more times available today. Please pick another day.' : 'All times are booked on this day. Please pick another day.');
   }
 
   dateIn.addEventListener('change', renderSlots);
@@ -287,26 +332,91 @@ const CLINIC = {
     if (name.length < 2) { setError('name', 'Please enter your name.'); firstBad = firstBad || form.elements.name; }
     if (!/^\+?\d{7,15}$/.test(phone)) { setError('phone', 'Please enter a valid phone number.'); firstBad = firstBad || form.elements.phone; }
 
+    let dateOk = false;
     if (!dateIn.value) {
       setError('date', 'Please choose a date.'); firstBad = firstBad || dateIn;
     } else if (dateIn.value < dateIn.min) {
       setError('date', 'Please choose today or a later date.'); firstBad = firstBad || dateIn;
-    } else if (hasHours) {
-      const [y, m, d] = dateIn.value.split('-').map(Number);
-      const day = new Date(y, m - 1, d).getDay();
-      if (!hours[day]) { setError('date', `Closed on ${DAYS[day]}s`); firstBad = firstBad || dateIn; }
+    } else if (form.querySelector('[data-error-for="date"]').textContent) {
+      firstBad = firstBad || dateIn; // closed day / holiday message already shown
+    } else {
+      dateOk = true;
+    }
+
+    if (dateOk && !timeIn.value) {
+      setError('time', 'Please choose a time.');
+      firstBad = firstBad || slotsWrap.querySelector('.slot:not([disabled])') || dateIn;
     }
 
     if (firstBad) firstBad.focus();
     return !firstBad;
   }
 
-  function summary() {
+  function bookingData() {
     const f = form.elements;
-    const bits = [f.service.value];
-    if (f.date.value) bits.push(fmtDate(f.date.value));
-    if (f.time.value) bits.push(f.time.value);
-    return bits.join(' · ');
+    return {
+      name: f.name.value.trim(),
+      phone: f.phone.value.trim(),
+      service: f.service.value,
+      date: f.date.value,
+      time: timeIn.value,
+      message: f.message.value.trim(),
+      bot: f['bot-field'].value
+    };
+  }
+
+  // Google Calendar "add to my calendar" link for the patient
+  function calendarLink(b, id) {
+    const start = b.date.replace(/-/g, '') + 'T' + b.time.replace(':', '') + '00';
+    const endMin = toMin(b.time) + CLINIC.slotMinutes;
+    const end = b.date.replace(/-/g, '') + 'T' + hhmm(endMin).replace(':', '') + '00';
+    const q = new URLSearchParams({
+      action: 'TEMPLATE',
+      text: 'Dental appointment: Kashyap Dental & Aesthetics',
+      dates: `${start}/${end}`,
+      ctz: CLINIC.timeZone,
+      details: `${b.service}${id ? `\nBooking ref: ${id}` : ''}\nClinic phone: +977 974-3679953`,
+      location: 'Kashyap Dental & Aesthetics, Tilottama Path, near Gastrocare, Butwal'
+    });
+    return `https://calendar.google.com/calendar/render?${q}`;
+  }
+
+  function showSuccess(b, confirmed, id) {
+    const when = `${fmtDate(b.date)} at ${prettyTime(b.time)}`;
+    $('#success-title').textContent = confirmed ? 'Appointment booked' : 'Request received';
+    $('#success-summary').textContent = confirmed
+      ? `Thank you, ${b.name}. Your ${b.service === 'Not sure / Check-up' ? 'appointment' : b.service + ' appointment'} is booked for ${when}. Please arrive 10 minutes early. We may call you on ${b.phone} if anything changes.`
+      : `Thank you, ${b.name}. We've received your request for ${when} and will call you on ${b.phone} to confirm.`;
+    const ref = $('#success-ref');
+    ref.hidden = !id;
+    if (id) {
+      ref.textContent = 'Booking reference: ';
+      const s = document.createElement('strong');
+      s.textContent = id;
+      ref.appendChild(s);
+    }
+    const cal = $('#add-cal');
+    cal.hidden = !confirmed;
+    if (confirmed) cal.href = calendarLink(b, id);
+    form.hidden = true;
+    successBox.hidden = false;
+    successBox.focus();
+  }
+
+  async function sendToNetlify(b) {
+    const fd = new FormData(form);
+    fd.set('time', prettyTime(b.time));
+    const res = await fetch('/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams(fd).toString()
+    });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+  }
+
+  function showError(msg) {
+    statusEl.textContent = msg;
+    statusEl.className = 'form-status error';
   }
 
   form.addEventListener('submit', async e => {
@@ -315,29 +425,38 @@ const CLINIC = {
     statusEl.className = 'form-status';
     if (!validate()) return;
 
+    const b = bookingData();
     submitBtn.disabled = true;
-    submitBtn.textContent = 'Sending…';
+    submitBtn.textContent = API ? 'Booking…' : 'Sending…';
     try {
-      const res = await fetch('/', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: new URLSearchParams(new FormData(form)).toString()
-      });
-      if (!res.ok) throw new Error('HTTP ' + res.status);
+      if (API) {
+        let result = null;
+        try {
+          // Sent as plain text so the browser doesn't need a CORS pre-check
+          const res = await fetch(API, { method: 'POST', body: JSON.stringify(b) });
+          result = await res.json();
+        } catch (netErr) { result = null; }
 
-      $('#success-summary').textContent =
-        `Thank you, ${form.elements.name.value.trim()}. We've received your request (${summary()}) and will contact you to confirm.`;
-      form.hidden = true;
-      successBox.hidden = false;
-      successBox.focus();
+        if (result && result.ok) { showSuccess(b, true, result.id); return; }
+        if (result && result.error === 'taken') {
+          await renderSlots();
+          showError('Sorry, that time was just booked by someone else. Please choose another time.');
+          return;
+        }
+        if (result && result.message) { showError(result.message); return; }
+        // Google unreachable → fall through and send as a request instead
+      }
+      await sendToNetlify(b);
+      showSuccess(b, false);
     } catch (err) {
-      statusEl.textContent = 'Sorry, the request could not be sent. Please use "Send via WhatsApp" or call the clinic.';
-      statusEl.className = 'form-status error';
+      showError('Your request could not be sent. Please check your internet connection and try again, or book on WhatsApp.');
     } finally {
       submitBtn.disabled = false;
-      submitBtn.textContent = 'Request appointment';
+      submitBtn.textContent = API ? 'Book appointment' : 'Request appointment';
     }
   });
+
+  if (API) submitBtn.textContent = 'Book appointment';
 
   $('#book-another').addEventListener('click', () => {
     form.reset();
@@ -349,14 +468,14 @@ const CLINIC = {
 
   // Send the same booking details as a WhatsApp message
   $('#wa-book').addEventListener('click', () => {
-    const f = form.elements;
+    const b = bookingData();
     const lines = ['Hello Kashyap Dental & Aesthetics, I would like to book an appointment.'];
-    if (f.name.value.trim()) lines.push(`Name: ${f.name.value.trim()}`);
-    if (f.phone.value.trim()) lines.push(`Phone: ${f.phone.value.trim()}`);
-    lines.push(`Treatment: ${f.service.value}`);
-    if (f.date.value) lines.push(`Preferred date: ${fmtDate(f.date.value)}`);
-    if (f.time.value) lines.push(`Preferred time: ${f.time.value}`);
-    if (f.message.value.trim()) lines.push(`Note: ${f.message.value.trim()}`);
+    if (b.name) lines.push(`Name: ${b.name}`);
+    if (b.phone) lines.push(`Phone: ${b.phone}`);
+    lines.push(`Treatment: ${b.service}`);
+    if (b.date) lines.push(`Preferred date: ${fmtDate(b.date)}`);
+    if (b.time) lines.push(`Preferred time: ${prettyTime(b.time)}`);
+    if (b.message) lines.push(`Note: ${b.message}`);
     window.open(waLink(lines.join('\n')), '_blank', 'noopener');
   });
 })();

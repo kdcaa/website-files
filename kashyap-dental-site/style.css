@@ -336,11 +336,22 @@ p{ color:var(--ink-soft); margin:0 0 1em; }
 }
 .slot:hover{ border-color:var(--accent); transform:translateY(-1px); }
 .slot[aria-pressed="true"]{ background:var(--accent); color:var(--surface); border-color:var(--accent); }
+.slot.full, .slot:disabled{
+  cursor:not-allowed; transform:none;
+  background:transparent; color:var(--ink-soft); opacity:.55;
+  border-style:dashed; text-decoration:line-through;
+  display:flex; flex-direction:column; align-items:center; line-height:1.2;
+}
+.slot.full small{ font-size:.68rem; text-decoration:none; letter-spacing:.04em; text-transform:uppercase; }
+.slots[aria-busy="true"]{ min-height:44px; background:linear-gradient(90deg, var(--surface), var(--line), var(--surface)); background-size:200% 100%; animation:shimmer 1.2s linear infinite; border-radius:var(--radius); }
+@keyframes shimmer{ from{ background-position:200% 0; } to{ background-position:-200% 0; } }
 
 .form-actions{ display:flex; gap:.8rem; flex-wrap:wrap; }
 .form-status{ margin:0; font-size:.88rem; }
 .form-status.error{ color:var(--warn); }
 
+.success-ref{ font-size:.92rem; color:var(--ink); background:var(--surface); display:inline-block; padding:.4em .9em; border:1px dashed var(--accent-2); border-radius:var(--radius); }
+.success-actions{ display:flex; gap:.8rem; justify-content:center; flex-wrap:wrap; margin-top:.4rem; }
 .booking-success{ text-align:center; padding:1.5rem .5rem; outline:none; animation:pop .35s var(--ease); }
 .success-mark{
   width:64px; height:64px; margin:0 auto 1rem; border-radius:50%;

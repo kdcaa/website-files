@@ -359,7 +359,7 @@
       <div class="reveal">
         <p class="eyebrow">Get in touch</p>
         <h2>Book your appointment.</h2>
-        <p>Choose a treatment and a preferred time. Our team will call or message to confirm.</p>
+        <p>Choose a treatment, a date and a time that suits you. Times already taken are greyed out.</p>
         <p class="contact-alt">Prefer to talk? Call <a href="tel:+9779743679953">+977 974-3679953</a>.</p>
       </div>
 
@@ -402,6 +402,7 @@
             <p class="slot-note" id="slot-note">Pick a date to see available times.</p>
             <div class="slots" id="slots" role="group" aria-labelledby="slot-note"></div>
             <input type="hidden" name="time" id="f-time">
+            <span class="field-error" data-error-for="time" aria-live="polite"></span>
           </div>
 
           <label for="f-message">Message <span class="optional">(optional)</span>
@@ -417,9 +418,13 @@
 
         <div class="booking-success" id="booking-success" hidden tabindex="-1">
           <div class="success-mark" aria-hidden="true">✓</div>
-          <h3>Request received</h3>
+          <h3 id="success-title">Request received</h3>
           <p id="success-summary">We'll contact you shortly to confirm your appointment.</p>
-          <button type="button" class="btn btn-ghost" id="book-another">Book another</button>
+          <p class="success-ref" id="success-ref" hidden></p>
+          <div class="success-actions">
+            <a class="btn btn-primary" id="add-cal" href="#" target="_blank" rel="noopener" hidden>Add to my calendar</a>
+            <button type="button" class="btn btn-ghost" id="book-another">Book another</button>
+          </div>
         </div>
       </div>
     </div>
