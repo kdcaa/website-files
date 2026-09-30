@@ -1,98 +1,106 @@
 # Kashyap Dental & Aesthetics — Website
 
-A simple, free website for your clinic. No coding tools needed to edit it —
-just text and image files.
+Free, fast, interactive clinic website. Plain HTML/CSS/JS: no build step,
+no monthly fees. Hosted on Netlify, domain kashyapdental.com.np.
 
-## Files in this folder
+## What's in this folder
 
-- `index.html` — the page content (text, sections)
-- `style.css` — colors, fonts, spacing (the beige theme)
-- `script.js` — small bits of interactivity (mobile menu, footer year)
-- `images/` — put your logo and photos here
+| File | What it does |
+|---|---|
+| `index.html` | All page content (text, services, FAQ, hours, booking form) |
+| `style.css` | Design. Colours live at the top in `:root { ... }` |
+| `script.js` | Interactivity. **Clinic settings are at the top** (WhatsApp number, Google review link) |
+| `thanks.html` | Shown after booking if a visitor has JavaScript off |
+| `404.html` | Friendly "page not found" page |
+| `_headers` | Security + caching headers (Netlify reads this automatically) |
+| `robots.txt`, `sitemap.xml` | Help Google find and index the site |
+| `images/` | Your logo and photos |
+
+## Interactive features
+
+- **Live "Open now / Closed" badge**: uses Nepal time, whatever the visitor's location
+- **Opening-hours table** that highlights today
+- **Booking form** with date picker, clickable time slots, validation, and closed-day blocking
+- **"Send via WhatsApp"**: turns the booking into a pre-filled WhatsApp message
+- **Service pop-ups**: "Learn more" on each service, with a "Book this treatment" button that pre-selects it in the form
+- **FAQ accordion**, scroll animations, active-section menu highlight
+- Floating WhatsApp button, back-to-top button, mobile menu
+- Google-friendly: structured data (Dentist schema), social share previews, sitemap
+- Accessible: keyboard friendly, skip link, respects "reduce motion"
 
 ## 1. Add your images
 
-Drop these files into the `images/` folder, using these exact names
-(or change the names inside `index.html` to match yours):
+Put these in `images/` with these exact names:
 
-| File name              | What it is                          |
-|------------------------|--------------------------------------|
-| `logo.png`             | Your clinic logo                    |
-| `clinic.jpg`           | A photo of the clinic interior      |
-| `dr-rekha.jpg`         | Photo of Dr. Rekha Pandey           |
-| `dr-specialist.jpg`    | Photo of the specialist doctor      |
+| File | What |
+|---|---|
+| `logo.png` | Clinic logo (also used as browser tab icon) |
+| `clinic.jpg` | Clinic photo (also the preview when the link is shared on Facebook/WhatsApp; landscape, about 1200×630 works best) |
+| `dr-rekha.jpg` | Dr. Rekha Pandey (square) |
+| `dr-specialist.jpg` | Specialist doctor (square) |
 
-If you don't have a photo yet, the site shows a soft placeholder box
-instead — nothing breaks.
+Missing photos show a neat placeholder; nothing breaks. Keep each image
+under ~300 KB (compress free at squoosh.app) so the site loads fast on mobile data.
 
-## 2. Edit the text
+## 2. Things to fill in / check
 
-Open `index.html` in any text editor (Notepad, TextEdit, VS Code, or
-even Netlify's web editor). Look for sections marked `<!-- EDIT: ... -->` —
-those are the spots meant to be changed:
+Search `index.html` for `EDIT:` and `[ ` to find placeholders:
 
-- Phone number (currently `+977XXXXXXXXXX`) — appears twice
-- Email address
-- Opening hours
-- Specialist doctor's name and **MDS specialisation** (currently left as
-  `[ Specialisation ]` — fill this in once confirmed)
-- Service list — add, remove, or rename treatments
-- Google Maps link (see below)
+- Specialist doctor's **name** and **MDS specialisation**
+- Service descriptions inside each `service-details` block (reviewed by the dentist)
+- **Opening hours**: edit the `hours-table`. The `data-open` / `data-close`
+  values (24h, e.g. `18:00`) drive the Open-now badge and booking slots.
+  For a closed day, remove `data-open`/`data-close` and write `Closed`.
+  Also update `openingHoursSpecification` in the `<head>` to match.
+- Phone number appears in several places; use find-and-replace if it changes.
 
-### Getting your Google Maps embed link
-1. Open [Google Maps](https://maps.google.com) and search your clinic location.
-2. Click **Share** → **Embed a map** → copy the link inside `src="..."`.
-3. Paste it in place of the existing `src` value in the `<iframe>` in `index.html`.
+In `script.js` (top of the file):
 
-## 3. Put the site online with Netlify (free)
+- `whatsapp`: number with country code, digits only
+- `reviewUrl`: paste your Google review link (Google Business Profile →
+  "Ask for reviews" → copy link). The "Review us on Google" button appears once set.
+- `slotMinutes`: booking slot length
 
-1. Go to **netlify.com** and sign up (free, no credit card needed).
-2. On your dashboard, find **"Add new site" → "Deploy manually"**
-   (sometimes labeled **"Sites" → drag-and-drop area**).
-3. Drag this **entire folder** (all the files together) into that box.
-4. Netlify uploads it and gives you a random URL like
-   `glowing-cupcake-123.netlify.app` — your site is now live.
-5. Open the link to check everything looks right.
+### Google Maps embed
+Google Maps → search your clinic → **Share → Embed a map** → copy the
+`src="..."` link → paste it into the `<iframe>` in the Visit section.
+Also point the "Get directions" button at your clinic's Maps share link.
 
-> Tip: keep editing locally, then drag-and-drop the folder again any
-> time you want to update — Netlify replaces the old version automatically.
+## 3. Deploy / update on Netlify
 
-## 4. Connect kashyapdental.com.np (your free .np domain) to Netlify
+**Simple way:** Netlify → your site → **Deploys** → drag this whole folder
+into the drop zone. Done in seconds.
 
-1. In Netlify, open your site → **Domain management** → **Add a domain** →
-   type `kashyapdental.com.np` → Add domain.
-2. Netlify will show you the records it needs. Usually this is:
-   - One **A record** pointing `@` (root domain) to Netlify's load
-     balancer IP — Netlify shows the exact IP, currently `75.2.60.5`.
-   - One **CNAME record** pointing `www` to your Netlify site address,
-     e.g. `your-site-name.netlify.app`.
-3. Go to **Cloudflare → your domain → DNS → Records** and add exactly
-   those two records:
+**Developer way (recommended):** put the folder in a GitHub repository,
+then Netlify → **Add new site → Import from Git** → pick the repo.
+Publish directory: `/` (leave build command empty). From then on, every
+change you push to GitHub auto-deploys, and you get full version history
+(you can roll back any mistake).
 
-   | Type  | Name | Content                          | Proxy status |
-   |-------|------|-----------------------------------|--------------|
-   | A     | @    | 75.2.60.5 (use the IP Netlify shows you) | DNS only (gray cloud) at first |
-   | CNAME | www  | your-site-name.netlify.app        | DNS only (gray cloud) at first |
+## 4. Domain (kashyapdental.com.np)
 
-   Keep the cloud icon **gray ("DNS only")** until the site is confirmed
-   working — orange ("Proxied") can be turned on afterward once it loads
-   correctly.
-4. Wait 10–60 minutes for DNS to update, then visit
-   `https://kashyapdental.com.np` to confirm it loads your site.
-5. Back in Netlify, click **"Verify DNS configuration"** on the domain
-   page — once verified, Netlify automatically issues a free HTTPS
-   certificate (so the site shows the padlock icon).
+Already connected via Cloudflare DNS:
 
-## 5. The contact form
+| Type | Name | Content | Proxy |
+|---|---|---|---|
+| A | @ | IP shown by Netlify (usually 75.2.60.5) | DNS only (grey) |
+| CNAME | www | your-site.netlify.app | DNS only (grey) |
 
-The form is wired for **Netlify Forms**, which is free and works
-automatically once deployed on Netlify — no setup needed. Form
-submissions appear under **Site → Forms** in your Netlify dashboard. You
-can connect email notifications there too (Forms → Settings → add a
-notification → email).
+Netlify issues free HTTPS automatically once DNS verifies.
 
-## Changing colors later
+## 5. Booking requests (Netlify Forms)
 
-All the colors live at the very top of `style.css`, inside `:root { ... }`.
-Change a hex value there and it updates the whole site — no need to hunt
-through the rest of the file.
+Submissions appear in Netlify → your site → **Forms → booking**.
+Set up email alerts: **Forms → Form notifications → Add notification → Email**.
+Free plan includes 100 submissions/month. Spam is filtered by a hidden honeypot field.
+
+After first deploy, open Forms and check "booking" is listed. If not, go to
+**Forms** and click **Enable form detection**, then redeploy.
+
+## 6. After launch
+
+- **Google Search Console** (free): add `kashyapdental.com.np`, verify via
+  Cloudflare DNS TXT record, then submit `https://kashyapdental.com.np/sitemap.xml`.
+- Put the website link on your **Google Business Profile**.
+- Test with **PageSpeed Insights** (pagespeed.web.dev); aim for 90+ on mobile.
+- Update `<lastmod>` in `sitemap.xml` when you make big content changes.
