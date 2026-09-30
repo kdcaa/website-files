@@ -20,7 +20,7 @@ const CLINIC = {
   // Online booking: paste your Google Apps Script "Web app URL" here
   // (ends in /exec — see README §5). While empty, the form sends
   // requests to Netlify Forms instead and the clinic confirms by phone.
-  bookingApi: ''
+  bookingApi: 'https://script.google.com/macros/s/AKfycbzjJS0rV6EMZ1e65p7nxpUaYN7f_MBRXIuVpw5tQgI_0zFTvInwfA8fndmyjmsjXvFiJg/exec'
 };
 /* -------------------------------------------------- */
 
