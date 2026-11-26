@@ -1,4 +1,30 @@
+# Search engines and AI search assistants are welcome to read this site.
 User-agent: *
+Allow: /
+
+# Google (Search, AI Overviews) and Bing (also used by ChatGPT search and Copilot)
+User-agent: Googlebot
+Allow: /
+
+User-agent: Bingbot
+Allow: /
+
+# ChatGPT search
+User-agent: OAI-SearchBot
+Allow: /
+
+User-agent: ChatGPT-User
+Allow: /
+
+# Claude search
+User-agent: Claude-SearchBot
+Allow: /
+
+User-agent: Claude-User
+Allow: /
+
+# Perplexity
+User-agent: PerplexityBot
 Allow: /
 
 Sitemap: https://kashyapdental.com.np/sitemap.xml
