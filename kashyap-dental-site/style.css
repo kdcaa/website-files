@@ -334,8 +334,9 @@ p{margin:0 0 1em}
 .footer-bottom{background:var(--tan);color:#fff;text-align:center;font-size:12px;padding:12px 20px;letter-spacing:.03em}
 
 /* ---------- Floating buttons ---------- */
-.fab-wa{position:fixed;right:20px;bottom:20px;z-index:40;width:52px;height:52px;border-radius:50%;background:var(--tan);color:#fff;display:grid;place-items:center;box-shadow:0 10px 28px -10px rgba(120,80,55,.6);transition:transform .35s var(--ease),background .3s}
-.fab-wa:hover{transform:translateY(-3px);background:var(--tan-dark)}
+.fab-wa{position:fixed;right:20px;bottom:20px;z-index:40;width:58px;height:58px;border-radius:50%;background:#25D366;color:#fff;display:grid;place-items:center;box-shadow:0 10px 26px -8px rgba(18,140,70,.65);transition:transform .35s var(--ease),background .3s}
+.fab-wa:hover{transform:translateY(-3px);background:#1ebe5b}
+.ico-star{vertical-align:-2px;margin-right:6px}
 .to-top{position:fixed;right:24px;bottom:84px;z-index:40;width:44px;height:44px;border-radius:50%;border:1px solid var(--line);background:#fff;color:var(--ink);cursor:pointer;font-size:16px;opacity:0;pointer-events:none;transform:translateY(10px);transition:opacity .4s,transform .4s var(--ease)}
 .to-top.show{opacity:1;pointer-events:auto;transform:none}
 
@@ -820,3 +821,5 @@ html.lenis,html.lenis body{height:auto}
   .footer-inner{grid-template-columns:minmax(0,1fr)}
   .page-head::after{opacity:.6}
 }
+
+.tx-ic{color:var(--tan-dark);display:block;margin-bottom:14px;opacity:.9}
