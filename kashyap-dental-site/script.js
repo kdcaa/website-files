@@ -59,6 +59,27 @@ const CLINIC = {
     return { day: dayIdx, minutes: hour * 60 + Number(get('minute')), date: `${get('year')}-${get('month')}-${get('day')}` };
   }
 
+  /* ---------- Smooth scrolling (Lenis, if it loaded) ---------- */
+  let lenis = null;
+  if (window.Lenis && !reduceMotion) {
+    try {
+      lenis = new window.Lenis({ lerp: 0.085, smoothWheel: true, wheelMultiplier: 0.95 });
+      const loop = t => { lenis.raf(t); requestAnimationFrame(loop); };
+      requestAnimationFrame(loop);
+    } catch (err) { lenis = null; }
+  }
+  const HEADER_OFFSET = () => -((document.querySelector('.site-header') || {}).offsetHeight || 0) - 12;
+  function scrollToEl(target, immediate) {
+    if (lenis) {
+      lenis.scrollTo(target === 0 ? 0 : target, { immediate: !!immediate, offset: target === 0 ? 0 : HEADER_OFFSET(), duration: 1.2 });
+    } else if (target === 0) {
+      window.scrollTo({ top: 0, behavior: immediate ? 'auto' : scrollBehavior });
+    } else {
+      const y = target.getBoundingClientRect().top + window.scrollY + HEADER_OFFSET();
+      window.scrollTo({ top: y, behavior: immediate ? 'auto' : scrollBehavior });
+    }
+  }
+
   /* ---------- Footer year ---------- */
   const yearEl = $('#year');
   if (yearEl) yearEl.textContent = new Date().getFullYear();
@@ -66,7 +87,7 @@ const CLINIC = {
   /* ---------- WhatsApp & review links from settings ---------- */
   $$('[data-whatsapp]').forEach(a => { a.href = waLink(a.dataset.whatsapp); });
   $$('[data-review-link]').forEach(a => {
-    if (CLINIC.reviewUrl) a.href = CLINIC.reviewUrl; else a.hidden = true;
+    if (CLINIC.reviewUrl) a.href = CLINIC.reviewUrl; else if (!a.dataset.reviewFallback) a.hidden = true;
   });
 
   /* ---------- Mobile navigation ---------- */
@@ -98,24 +119,131 @@ const CLINIC = {
   };
   window.addEventListener('scroll', onScroll, { passive: true });
   onScroll();
-  if (toTop) toTop.addEventListener('click', () => window.scrollTo({ top: 0, behavior: scrollBehavior }));
+  if (toTop) toTop.addEventListener('click', () => scrollToEl(0));
 
-  /* ---------- Highlight current section in nav ---------- */
-  const navLinks = $$('.site-nav a[href^="#"]:not(.nav-cta)');
-  const sections = navLinks.map(a => $(a.getAttribute('href'))).filter(Boolean);
-  if ('IntersectionObserver' in window && sections.length) {
-    const io = new IntersectionObserver(entries => {
-      entries.forEach(en => {
-        if (en.isIntersecting) {
-          navLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + en.target.id));
-        }
+  /* ---------- Tabs: each nav link opens its own view ----------
+     Any link to #id shows the view that contains that id. */
+  const views = $$('[data-view]');
+  const HOME_TITLE = document.title;
+  const navLinks = $$('.site-nav a[href^="#"]');
+  function viewFor(id) {
+    const el = id && document.getElementById(id);
+    if (!el) return null;
+    const view = el.matches('[data-view]') ? el : el.closest('[data-view]');
+    return view ? { el, view } : null;
+  }
+  const ink = document.querySelector('.tab-ink');
+  function moveInk() {
+    if (!ink) return;
+    const act = document.querySelector('.tabbar a.active');
+    if (!act) { ink.style.opacity = '0'; return; }
+    ink.style.opacity = '1';
+    ink.style.transform = `translateX(${act.offsetLeft}px)`;
+    ink.style.width = `${act.offsetWidth}px`;
+  }
+  window.addEventListener('resize', moveInk);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(moveInk);
+
+  function swapTo(view, el, changed) {
+    views.forEach(v => { v.hidden = v !== view; v.classList.toggle('view-in', v === view && changed); });
+    navLinks.forEach(a => a.classList.toggle('active', a.getAttribute('href') === '#' + view.id));
+    moveInk();
+    const act = document.querySelector('.tabbar a.active');
+    const bar = act && act.closest('.tabbar');
+    if (bar) bar.scrollTo({ left: act.offsetLeft - (bar.clientWidth - act.offsetWidth) / 2, behavior: changed ? 'smooth' : 'auto' });
+    if (el === view) scrollToEl(0, changed);
+    else requestAnimationFrame(() => scrollToEl(el, changed));
+    if (changed) {
+      const h = view.querySelector('h1');
+      document.title = view.id === 'home' || !h ? HOME_TITLE
+        : `${(h.getAttribute('aria-label') || h.textContent).replace(/\s+/g, ' ').trim()} | Kashyap Dental & Aesthetics`;
+    }
+  }
+  function showView(id, push) {
+    const hit = viewFor(id) || viewFor('home');
+    if (!hit) return;
+    const { el, view } = hit;
+    const changed = view.hidden;
+    if (push && location.hash !== '#' + id) { try { history.pushState(null, '', '#' + id); } catch (err) { /* sandboxed preview */ } }
+    // Cross-fade between tabs where the browser supports it
+    if (changed && push && document.startViewTransition && !reduceMotion) {
+      document.startViewTransition(() => swapTo(view, el, changed));
+    } else {
+      swapTo(view, el, changed);
+    }
+  }
+  document.addEventListener('click', e => {
+    const a = e.target.closest('a[href^="#"]');
+    if (!a || e.defaultPrevented || e.metaKey || e.ctrlKey) return;
+    const id = a.getAttribute('href').slice(1);
+    if (id === 'main') return; // skip link
+    if (!viewFor(id)) {
+      const target = id && document.getElementById(id);
+      if (target && lenis) { e.preventDefault(); scrollToEl(target); try { history.pushState(null, '', '#' + id); } catch (err) {} }
+      return;
+    }
+    e.preventDefault();
+    showView(id, true);
+  });
+  window.addEventListener('popstate', () => showView(location.hash.slice(1) || 'home'));
+  function goTo(id) { showView(id, true); }
+  showView(location.hash.slice(1) || 'home');
+
+  /* ---------- Text animation: split headings into words ---------- */
+  const splits = $$('[data-split]');
+  splits.forEach(el => {
+    let i = 0;
+    const walk = node => {
+      [...node.childNodes].forEach(ch => {
+        if (ch.nodeType === 3) {
+          const frag = document.createDocumentFragment();
+          ch.textContent.split(/(\s+)/).forEach(part => {
+            if (!part) return;
+            if (/^\s+$/.test(part)) { frag.appendChild(document.createTextNode(' ')); return; }
+            const w = document.createElement('span'); w.className = 'w';
+            const wi = document.createElement('span'); wi.className = 'wi';
+            wi.style.setProperty('--i', i++); wi.textContent = part;
+            w.appendChild(wi); frag.appendChild(w);
+          });
+          ch.replaceWith(frag);
+        } else if (ch.nodeType === 1 && ch.tagName !== 'BR') walk(ch);
       });
-    }, { rootMargin: '-45% 0px -50% 0px' });
-    sections.forEach(s => io.observe(s));
+    };
+    el.setAttribute('aria-label', el.textContent.replace(/\s+/g, ' ').trim());
+    walk(el);
+    [...el.children].forEach(c => c.setAttribute('aria-hidden', 'true'));
+  });
+
+  /* ---------- Page-load sequence (hero) ---------- */
+  const heroTitle = $('.hero h1');
+  requestAnimationFrame(() => requestAnimationFrame(() => {
+    document.documentElement.classList.add('loaded');
+    if (heroTitle) { heroTitle.style.setProperty('--base', '.25s'); heroTitle.classList.add('in'); }
+  }));
+
+  /* ---------- Gentle parallax on the arched hero photo ---------- */
+  const archImg = $('.arch-frame img');
+  const drift = $$('.photo-offset img, .doctor-photo img, .post-img img');
+  if (!reduceMotion) {
+    let ticking = false;
+    const para = () => {
+      const y = Math.min(window.scrollY, 900);
+      if (archImg) archImg.style.setProperty('--py', `${(-y * 0.08).toFixed(1)}px`);
+      const vh = window.innerHeight;
+      drift.forEach(img => {
+        const r = img.getBoundingClientRect();
+        if (!r.height || r.bottom < 0 || r.top > vh) return;
+        const p = (r.top + r.height / 2 - vh / 2) / vh; // -1 … 1
+        img.style.transform = `translate3d(0, ${(p * -18).toFixed(1)}px, 0) scale(1.06)`;
+      });
+      ticking = false;
+    };
+    window.addEventListener('scroll', () => { if (!ticking) { ticking = true; requestAnimationFrame(para); } }, { passive: true });
+    para();
   }
 
   /* ---------- Reveal on scroll ---------- */
-  const reveals = $$('.reveal');
+  const reveals = $$('.reveal, [data-split]').filter(el => el !== heroTitle);
   if (!reduceMotion && 'IntersectionObserver' in window) {
     const ro = new IntersectionObserver((entries, obs) => {
       entries.forEach(en => {
@@ -185,31 +313,41 @@ const CLINIC = {
 
     $$('.service-card').forEach(card => {
       const btn = $('.service-more-btn', card);
-      const details = $('.service-details', card);
-      if (!btn || !details) return;
+      const details = $('.service-details', card) ||
+        $(`#treatments [data-service="${CSS.escape(card.dataset.service || '')}"] .service-details`);
+      if (!btn) return;
+      if (!details) { btn.addEventListener('click', () => goTo(btn.dataset.go || 'treatments')); return; }
       btn.addEventListener('click', () => {
-        const name = $('h3', card).textContent.trim();
+        const name = card.dataset.service || $('h3', card).textContent.trim();
         titleEl.textContent = name;
         bodyEl.innerHTML = details.innerHTML;
         bookBtn.dataset.service = name;
         dialog.showModal();
+        if (lenis) lenis.stop();
       });
     });
 
     $$('[data-close-dialog]', dialog).forEach(b => b.addEventListener('click', () => dialog.close()));
+    dialog.addEventListener('close', () => { if (lenis) lenis.start(); });
     dialog.addEventListener('click', e => { if (e.target === dialog) dialog.close(); });
 
     bookBtn.addEventListener('click', () => {
       dialog.close();
       selectService(bookBtn.dataset.service);
-      const target = $('#contact');
-      if (target) target.scrollIntoView({ behavior: scrollBehavior });
+      goTo('contact');
       setTimeout(() => { const n = $('#f-name'); if (n) n.focus({ preventScroll: true }); }, reduceMotion ? 0 : 600);
     });
   } else {
     // Very old browsers: hide "Learn more" buttons instead of showing a broken pop-up
     $$('.service-more-btn').forEach(b => { b.hidden = true; });
   }
+
+  /* ---------- "Book Now" buttons on service cards ---------- */
+  $$('[data-book]').forEach(btn => btn.addEventListener('click', () => {
+    selectService(btn.dataset.book);
+    goTo('contact');
+    setTimeout(() => { const n = $('#f-name'); if (n) n.focus({ preventScroll: true }); }, reduceMotion ? 0 : 700);
+  }));
 
   /* ---------- Booking form ----------
      With CLINIC.bookingApi set: live availability + instant booking via Google.
@@ -376,7 +514,7 @@ const CLINIC = {
       dates: `${start}/${end}`,
       ctz: CLINIC.timeZone,
       details: `${b.service}${id ? `\nBooking ref: ${id}` : ''}\nClinic phone: +977 974-3679953`,
-      location: 'Kashyap Dental & Aesthetics, Tilottama Path, near Gastrocare, Butwal'
+      location: 'Kashyap Dental & Aesthetics, Tilottama Path (Hospital Line), near Gastrocare, Butwal'
     });
     return `https://calendar.google.com/calendar/render?${q}`;
   }
