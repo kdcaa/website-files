@@ -162,3 +162,34 @@ free daily quotas: far more than a clinic needs.
 - Put the website link on your **Google Business Profile**.
 - Test with **PageSpeed Insights** (pagespeed.web.dev); aim for 90+ on mobile.
 - Update `<lastmod>` in `sitemap.xml` when you make big content changes.
+
+## 7. 2026 redesign notes
+
+- **Tabs:** the top menu now opens separate pages inside `index.html`:
+  Home, Treatments, Toothache?, Prices, Reviews, About (with doctors), FAQ,
+  Visit, Book. Each lives in a `<div class="view" id="…">` block. Any link to
+  `#id` opens the tab that contains it, and the browser Back button works.
+- **Hours:** every day 8:00–19:00 (Saturday included). Change them in the
+  `hours-table` on the Visit tab **and** in `openingHoursSpecification` in `<head>`.
+  **Also update `HOURS` in your Google Apps Script (`Code.gs`) to 08:00–19:00 for
+  all seven days, then redeploy (see "Changing the script later")**, or online
+  booking will refuse Saturdays and the new early and late slots.
+- **Treatments:** the booking form's options now match the 13 treatment cards.
+  If you rename a card's `data-service`, rename its `<option>` too.
+- **Nepali text** uses class `np`. Edit it freely.
+- **Toothache tab:** first-aid text should be checked by Dr. Rekha before going live.
+
+## 8. Blog, bridal package and tabs (update)
+
+- **Top tabs:** Home, Treatments, Aesthetics, Toothache?, Prices, Visit, Book (one horizontal row; scrolls sideways on phones).
+  **About, Reviews, Blog and FAQ** are in the "More from the clinic" bar above the footer on every page.
+- **Aesthetics tab** (`id="aesthetics"`): 12 aesthetic treatments, each bookable. The Bride & Groom package is a
+  small section at the bottom of it (`id="bridal"`). Confirm treatments, inclusions and timeline with Dr. Rekha.
+- **Smooth scrolling** uses Lenis from cdn.jsdelivr.net; if it can't load, the site falls back to normal scrolling.
+- **Blog:** articles are real pages in `/blog/` so Google can index them.
+  The first one is `blog/dental-aesthetics.html`. To add another, copy that file, change the
+  title, description, canonical URL, date and text, then list it in the Blog tab
+  (`id="blog"` in `index.html`) and add its URL to `sitemap.xml`.
+- After deploying, open Google Search Console → Sitemaps and submit `sitemap.xml` again,
+  then use **URL inspection → Request indexing** on the article URL.
+- Content is generated from `gen.py` (kept outside the site folder); you can also edit the HTML directly.
