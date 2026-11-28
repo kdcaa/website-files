@@ -827,3 +827,7 @@ html.lenis,html.lenis body{height:auto}
 .promo-couple{height:35px;width:auto;margin-right:6px;filter:drop-shadow(0 2px 3px rgba(90,50,30,.25))}
 @media(max-width:560px){.promo-couple{height:30px;width:auto}}
 .promo-couple{border-radius:10px;border:1.5px solid #fff;background:#fff8f5;box-shadow:0 3px 8px -3px rgba(90,50,30,.4)}
+
+.post-tags-wrap{margin:44px 0 8px}
+.post-tags{list-style:none;padding:0;margin:12px 0 0;display:flex;flex-wrap:wrap;gap:8px}
+.post-tags li{font:500 12px/1 var(--sans);letter-spacing:.03em;color:var(--tan-dark);background:var(--band);border:1px solid #E7DBD2;border-radius:999px;padding:8px 13px}
